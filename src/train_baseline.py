@@ -7,9 +7,7 @@ def main():
     X_train, y_train, X_val, y_val = load_train_val()
     model = LogisticRegression(
         max_iter=200,
-        multi_class="multinomial",
-        verbose=1,
-        n_jobs=-1
+        verbose=1
     )
 
     model.fit(X_train, y_train)
