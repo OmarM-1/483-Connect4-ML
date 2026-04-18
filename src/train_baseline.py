@@ -8,10 +8,8 @@ def main():
 
     model = LogisticRegression(
         max_iter=200,
-        multi_class="multinomial",
         solver="lbfgs",
         verbose=1,
-        n_jobs=-1,
         random_state=0,
     )
 
