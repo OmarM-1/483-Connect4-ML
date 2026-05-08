@@ -4,13 +4,16 @@ Machine learning project for predicting strong Connect 4 moves from board positi
 
 The project uses a UCI Connect 4 midgame dataset. Each position is represented by the move sequence that produced the board, and the target label is the solver recommended `best_move`.
 
+The project also includes an AlphaZero-style self-play pipeline that fine-tunes a convolutional neural network using MCTS-generated data, giving the model coverage over early-game positions not present in the solver dataset. The trained model can play live games autonomously on papergames.io via a browser bridge.
+
 ## Requirements
 
 * Python 3.10 or newer
 * `pip`
 * Optional: GNU Make, if you want to use the `make` commands
+* Optional: CUDA-capable GPU for self-play and training (CPU works but is slow)
 
-Python dependencies are listed in `requirements.txt`.
+Python dependencies are listed in `requirements.txt`. The browser bridge additionally requires `playwright` and a Firefox installation via `playwright install firefox`.
 
 ## Setup
 
@@ -109,6 +112,42 @@ make clean
 * `max_depth=16`
 * `random_state=1`
 
+### CNN + MCTS (AlphaZero-style)
+
+`src/train_network.py` trains a convolutional neural network (64 filters, 6 residual blocks) on the solver dataset. The network has a policy head (7-dim move distribution) and a value head (win probability).
+
+`src/self_play.py` uses MCTS with the trained network to generate self-play games covering all plies from move 0. `src/train_selfplay.py` fine-tunes the network on this data mixed with the original solver data to prevent forgetting.
+
+`src/run_iteration.py` orchestrates one full iteration: generate games → fine-tune → log stats.
+
+Run one self-play iteration:
+
+```bash
+python src/run_iteration.py \
+  --start-model artifacts/models/connect4_net.pth \
+  --iter 0 --n-iters 1 \
+  --filters 64 --n-residuals 6 \
+  --games-per-iter 300 --simulations 100 \
+  --supervised-csv data/UCI-Midgame-d30.train.csv \
+  --device cuda
+```
+
+Check progress across iterations:
+
+```bash
+python src/show_progress.py
+```
+
+Evaluate a model against random, a previous model, and the C++ solver:
+
+```bash
+python src/eval_winrate.py \
+  --model artifacts/models/selfplay_iter1.pth \
+  --prev-model artifacts/models/connect4_net.pth \
+  --solver /path/to/solver \
+  --games 20
+```
+
 ## Evaluation
 
 `src/evaluate.py` reports:
@@ -122,6 +161,24 @@ make clean
 
 The illegal move rate checks whether predicted columns are playable in the corresponding board position.
 
-## Future
+## Browser Bridge
 
-In the process of having the model be playable against on https://papergames.io/en/connect4 via the play with a friend feature
+The bridge automates live play on papergames.io using the CNN+MCTS model.
+
+Setup (first time):
+
+```bash
+.venv/bin/playwright install firefox
+```
+
+Launch:
+
+```bash
+bash launch_bridge.sh --our-username "Your Username"
+```
+
+Override model:
+
+```bash
+BRIDGE_MODEL=artifacts/models/selfplay_iter1.pth bash launch_bridge.sh --our-username "Your Username"
+```
