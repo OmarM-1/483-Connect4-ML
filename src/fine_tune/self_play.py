@@ -128,7 +128,7 @@ def main() -> int:
 
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
-    from network import Connect4Net, NetConfig
+    from src.train.network import Connect4Net, NetConfig
     from mcts import MCTS
 
     device_str = args.device or ("cuda" if torch.cuda.is_available() else "cpu")

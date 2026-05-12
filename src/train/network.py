@@ -247,7 +247,7 @@ class MCTSClient:
         state = checkpoint.get("net_state_dict", checkpoint)
         net.load_state_dict(state)
 
-        from mcts import MCTS
+        from src.fine_tune.mcts import MCTS
         self.mcts = MCTS(net, simulations=simulations, c_puct=c_puct, device=device)
         self.simulations = simulations
 

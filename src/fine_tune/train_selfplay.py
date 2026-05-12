@@ -51,7 +51,7 @@ class SelfPlayDataset(Dataset):
     """Rows from self_play.py CSV: (sequence, mcts_policy, outcome)."""
 
     def __init__(self, df: pd.DataFrame) -> None:
-        from network import sequence_to_tensor
+        from src.train.network import sequence_to_tensor
         self._seq_to_tensor = sequence_to_tensor
         self.sequences = df["sequence"].fillna("").astype(str).tolist()
         self.policies  = [
@@ -74,7 +74,7 @@ class SupervisedDataset(Dataset):
     """Solver-labeled CSV. Converts best_move → one-hot policy, solver_score → outcome."""
 
     def __init__(self, df: pd.DataFrame) -> None:
-        from network import sequence_to_tensor
+        from src.train.network import sequence_to_tensor
         self._seq_to_tensor = sequence_to_tensor
         self.sequences = df["sequence"].fillna("").astype(str).tolist()
         moves = df["best_move"].astype(int).values - 1  # 0-based
@@ -186,8 +186,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
-    from network import Connect4Net, NetConfig
-    from train_network import Connect4Dataset  # reuse for val evaluation
+    from src.train.network import Connect4Net, NetConfig
+    from src.train.train_network import Connect4Dataset  # reuse for val evaluation
 
     args = parse_args()
     torch.manual_seed(args.seed)

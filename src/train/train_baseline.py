@@ -1,6 +1,11 @@
 from sklearn.linear_model import LogisticRegression
-from dataset import load_train_val_with_mask
-from evaluate import evaluate_predictions, print_metrics
+import sys
+from pathlib import Path
+# ensure the repository's src directory is on sys.path so local modules (like dataset) can be imported
+# add the repository root's "src" explicitly to help static analyzers and runtime resolve local modules
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
+from src.prepare.dataset import load_train_val_with_mask
+from src.evaluate.evaluate import evaluate_predictions, print_metrics
 
 
 def main():

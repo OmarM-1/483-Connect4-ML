@@ -1,6 +1,6 @@
 from sklearn.ensemble import RandomForestClassifier
-from dataset import load_train_val_with_mask
-from evaluate import evaluate_predictions, print_metrics
+from src.prepare.dataset import load_train_val_with_mask
+from src.evaluate.evaluate import evaluate_predictions, print_metrics
 
 def main():
     X_train, y_train, train_masks, X_val, y_val, val_masks = load_train_val_with_mask()

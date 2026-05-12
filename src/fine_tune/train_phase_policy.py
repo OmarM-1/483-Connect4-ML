@@ -31,7 +31,7 @@ if _torch_spec is not None:
 else:
     torch = None
 
-from preprocess import (
+from src.prepare.preprocess import (
     board_from_current_player_perspective,
     get_legal_moves,
     sequence_to_board,

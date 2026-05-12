@@ -276,7 +276,7 @@ class MCTS:
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-    from network import Connect4Net, NetConfig
+    from src.train.network import Connect4Net, NetConfig
 
     net = Connect4Net(NetConfig(filters=32, n_residuals=3))
     mcts = MCTS(net, simulations=50)

@@ -83,8 +83,8 @@ class MCTSAgent:
     def __init__(self, model_path: str, filters: int, n_residuals: int,
                  simulations: int, device: str) -> None:
         sys.path.insert(0, str(Path(__file__).parent))
-        from network import Connect4Net, NetConfig
-        from mcts import MCTS
+        from src.train.network import Connect4Net, NetConfig
+        from src.fine_tune.mcts import MCTS
 
         cfg = NetConfig(filters=filters, n_residuals=n_residuals)
         net = Connect4Net(cfg)
