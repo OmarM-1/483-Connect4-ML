@@ -31,6 +31,68 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
+## Windows
+
+Open **PowerShell** or **Command Prompt** in the `483-Connect4-ML/` directory.
+
+**Setup:**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install --upgrade pip
+.venv\Scripts\python -m pip install -r requirements.txt
+```
+
+**Inspect dataset:**
+
+```powershell
+.venv\Scripts\python src/check_data.py
+```
+
+**Train baseline (logistic regression):**
+
+```powershell
+.venv\Scripts\python src/train_baseline.py
+```
+
+**Train phase-aware policy (SGD):**
+
+```powershell
+.venv\Scripts\python src/train_phase_policy.py ^
+  --phase mid ^
+  --train-csv data/UCI-Midgame-d30.train.csv ^
+  --val-csv data/UCI-Midgame-d30.val.csv
+```
+
+Replace `mid` with `early`, `late`, or `all` for other phase windows.
+
+**Train CNN + MCTS (AlphaZero-style):**
+
+```powershell
+.venv\Scripts\python src/train_network.py
+```
+
+Run one self-play iteration (CPU — slow; use `--device cuda` if GPU available):
+
+```powershell
+.venv\Scripts\python src/run_iteration.py ^
+  --start-model artifacts/models/connect4_net.pth ^
+  --iter 0 --n-iters 1 ^
+  --filters 64 --n-residuals 6 ^
+  --games-per-iter 300 --simulations 100 ^
+  --supervised-csv data/UCI-Midgame-d30.train.csv ^
+  --device cpu
+```
+
+**Browser bridge (optional):**
+
+```powershell
+.venv\Scripts\python -m playwright install firefox
+.venv\Scripts\python browser_bridge.py --our-username "Your Username"
+```
+
+Outputs (models, metrics, reports) go to `artifacts/` regardless of platform.
+
 ## Feature Representation
 
 `src/preprocess.py` converts each move sequence into a `6 x 7` board:
