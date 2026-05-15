@@ -115,6 +115,7 @@ def train_epoch(
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    train_value: bool = True,
 ) -> dict:
     net.train()
     total_policy_loss = 0.0
@@ -131,7 +132,12 @@ def train_epoch(
 
         p_loss = soft_policy_loss(pred_policy, pi)
         v_loss = F.mse_loss(pred_value, z)
-        (p_loss + v_loss).backward()
+
+        if train_value:
+            (p_loss + v_loss).backward()
+        else:
+            p_loss.backward()
+
         optimizer.step()
 
         bs = x.size(0)
@@ -165,7 +171,8 @@ def evaluate_supervised(net, val_loader: DataLoader, device: torch.device) -> di
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--data-csv",       required=True,  type=Path)
-    p.add_argument("--init-model",     required=True,  type=Path, help="Checkpoint to fine-tune from")
+    p.add_argument("--init-model",     type=Path, default=None, help="Checkpoint to fine-tune from (omit for random init)")
+    p.add_argument("--random-init",    action="store_true", help="Start from random weights instead of loading a checkpoint")
     p.add_argument("--model-out",      required=True,  type=Path)
     p.add_argument("--metrics-out",    type=Path, default=None)
     p.add_argument("--supervised-csv", type=Path, default=None, help="Solver CSV for mixed training")
@@ -176,6 +183,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size",     type=int,  default=512)
     p.add_argument("--lr",             type=float, default=0.001)
     p.add_argument("--weight-decay",   type=float, default=1e-4)
+    p.add_argument("--freeze-value-head", action="store_true",
+                   help="Freeze value head weights — only policy head + body update from self-play")
     p.add_argument("--sup-ratio",      type=float, default=3.0,
                    help="Supervised samples per self-play sample (default 3.0 = 75%% supervised)")
     p.add_argument("--seed",           type=int,  default=42)
@@ -210,17 +219,20 @@ def main() -> int:
 
         from torch.utils.data import ConcatDataset, WeightedRandomSampler
         combined = ConcatDataset([sp_ds, sup_ds])
-        # Weight: each self-play sample weight=sup_ratio, each supervised sample weight=1
-        # → effective ratio sup_ratio:1 supervised:self-play in expectation
-        sp_weight  = float(args.sup_ratio)
-        sup_weight = 1.0
-        weights = ([sp_weight] * len(sp_ds)) + ([sup_weight] * len(sup_ds))
+        # Normalize by dataset size so total weight of each split equals its
+        # desired proportion regardless of how many rows each split has.
+        # P(sp sample)  = 1 / (1 + sup_ratio)
+        # P(sup sample) = sup_ratio / (1 + sup_ratio)
+        sp_weight_each  = 1.0 / len(sp_ds)
+        sup_weight_each = float(args.sup_ratio) / len(sup_ds)
+        weights = ([sp_weight_each] * len(sp_ds)) + ([sup_weight_each] * len(sup_ds))
         # Total samples per epoch = len(sp_ds) * (1 + sup_ratio)
         n_samples = int(len(sp_ds) * (1 + args.sup_ratio))
         sampler = WeightedRandomSampler(weights, num_samples=n_samples, replacement=True)
         train_loader = DataLoader(combined, batch_size=args.batch_size, sampler=sampler,
                                   num_workers=2, pin_memory=True)
-        print(f"Combined samples/epoch: {n_samples}")
+        sp_pct = 100.0 / (1 + args.sup_ratio)
+        print(f"Combined samples/epoch: {n_samples}  ({sp_pct:.0f}% self-play / {100-sp_pct:.0f}% supervised)")
     else:
         train_loader = DataLoader(sp_ds, batch_size=args.batch_size, shuffle=True,
                                   num_workers=2, pin_memory=True)
@@ -237,11 +249,22 @@ def main() -> int:
     # Load model
     cfg = NetConfig(filters=args.filters, n_residuals=args.n_residuals)
     net = Connect4Net(cfg).to(device)
-    ckpt = torch.load(args.init_model, map_location=device, weights_only=False)
-    net.load_state_dict(ckpt.get("net_state_dict", ckpt))
-    print(f"Loaded weights from {args.init_model}")
+    if args.random_init or args.init_model is None:
+        print("Random weight initialization")
+    else:
+        ckpt = torch.load(args.init_model, map_location=device, weights_only=False)
+        net.load_state_dict(ckpt.get("net_state_dict", ckpt))
+        print(f"Loaded weights from {args.init_model}")
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    if args.freeze_value_head:
+        for p in net.value_head.parameters():
+            p.requires_grad = False
+        print("Value head frozen — only policy head + body will update")
+
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, net.parameters()),
+        lr=args.lr, weight_decay=args.weight_decay,
+    )
 
     history = []
     best_top1 = 0.0
@@ -249,7 +272,8 @@ def main() -> int:
     t0 = time.time()
 
     for epoch in range(1, args.epochs + 1):
-        train_stats = train_epoch(net, train_loader, optimizer, device)
+        train_stats = train_epoch(net, train_loader, optimizer, device,
+                                  train_value=not args.freeze_value_head)
 
         val_str = ""
         val_stats = {}

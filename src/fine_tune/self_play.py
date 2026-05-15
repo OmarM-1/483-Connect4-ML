@@ -109,7 +109,8 @@ def trajectory_to_rows(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model",       required=True,  help="Path to .pth checkpoint")
+    p.add_argument("--model",       default=None,   help="Path to .pth checkpoint (omit for random init)")
+    p.add_argument("--random-model", action="store_true", help="Use randomly initialized network")
     p.add_argument("--filters",     type=int, default=64)
     p.add_argument("--n-residuals", type=int, default=6)
     p.add_argument("--games",       type=int, default=300, help="Number of games to generate")
@@ -136,11 +137,15 @@ def main() -> int:
 
     cfg = NetConfig(filters=args.filters, n_residuals=args.n_residuals)
     net = Connect4Net(cfg)
-    ckpt = torch.load(args.model, map_location=device, weights_only=False)
-    net.load_state_dict(ckpt.get("net_state_dict", ckpt))
+    if not args.random_model and args.model and args.model != "RANDOM":
+        ckpt = torch.load(args.model, map_location=device, weights_only=False)
+        net.load_state_dict(ckpt.get("net_state_dict", ckpt))
+        model_label = args.model
+    else:
+        model_label = "random-init"
 
     mcts = MCTS(net, simulations=args.simulations, device=device_str)
-    print(f"Model:  {args.model}  ({args.filters}f/{args.n_residuals}r)")
+    print(f"Model:  {model_label}  ({args.filters}f/{args.n_residuals}r)")
     print(f"Games:  {args.games}  Sims/move: {args.simulations}  Device: {device_str}")
     print(f"Output: {args.out}  Mirror: {not args.no_mirror}")
 

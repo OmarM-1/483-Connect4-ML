@@ -12,7 +12,7 @@ VENV_PY := $(VENV_DIR)/bin/python
 VENV_PIP := $(VENV_DIR)/bin/pip
 endif
 
-.PHONY: help venv install setup check-data dataset train train-phase train-rl-4-12 clean
+.PHONY: help venv install setup check-data dataset train train-phase train-rl-4-12 train-rf-filtered clean
 
 PHASE ?= mid
 PHASE_TRAIN_CSV ?= data/UCI-Midgame-d30.train.csv
@@ -99,6 +99,9 @@ train-rl-4-12: install
 		--model-out artifacts/models/connect4_phase_policy_rl_reinforce_linear_seeded_ply4_12.pkl \
 		--metrics-out artifacts/metrics/connect4_phase_policy_rl_reinforce_linear_seeded_ply4_12_metrics.json \
 		--report-out artifacts/reports/connect4_phase_policy_rl_reinforce_linear_seeded_ply4_12_report.txt
+
+train-rf-filtered: install
+	$(VENV_PY) src/train/train_rf_filtered.py
 
 clean:
 	$(PYTHON) -c "import pathlib, shutil; root=pathlib.Path('.'); shutil.rmtree(root/'.venv', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in root.rglob('__pycache__')]"

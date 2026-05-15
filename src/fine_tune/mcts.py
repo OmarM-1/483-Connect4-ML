@@ -140,8 +140,11 @@ class Node:
         return self.value_sum / self.visit_count
 
     def ucb_score(self, parent_visits: int, c_puct: float) -> float:
+        # self.q_value is from THIS node's current player (the opponent of the
+        # parent who is choosing). Parent wants to maximize its own win prob =
+        # minimize opponent's win prob = maximize (1 - q_value).
         u = c_puct * self.prior * math.sqrt(parent_visits) / (1 + self.visit_count)
-        return self.q_value + u
+        return (1.0 - self.q_value) + u
 
     def best_child(self, c_puct: float) -> "Node":
         n = self.visit_count
