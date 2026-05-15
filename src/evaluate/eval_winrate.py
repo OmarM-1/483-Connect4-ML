@@ -147,9 +147,11 @@ class RandomAgent:
 # Match
 # ---------------------------------------------------------------------------
 
-def play_match(model_agent, opponent_agent, n_games: int, rng) -> dict:
+def play_match(model_agent, opponent_agent, n_games: int, rng,
+               model_name: str = "model", opp_name: str = "opp") -> dict:
     """Play n_games, alternating who goes first. Returns W/L/D for model."""
     wins = losses = draws = 0
+    w = max(len(model_name), len(opp_name), 4)
 
     for g in range(n_games):
         board    = Board()
@@ -171,13 +173,16 @@ def play_match(model_agent, opponent_agent, n_games: int, rng) -> dict:
         model_player = 1 if model_is_p1 else 2
         if board.winner == 0:
             draws += 1
+            winner_label = "draw"
         elif board.winner == model_player:
             wins += 1
+            winner_label = model_name
         else:
             losses += 1
+            winner_label = opp_name
 
         total = wins + losses + draws
-        print(f"  Game {total:>3}/{n_games}  {'model' if board.winner == model_player else ('draw' if board.winner == 0 else 'opp  ')} wins  "
+        print(f"  Game {total:>3}/{n_games}  {winner_label:<{w}} wins  "
               f"W={wins} L={losses} D={draws}")
 
     total = wins + losses + draws
@@ -205,9 +210,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--prev-filters",     type=int, default=None)
     p.add_argument("--prev-residuals",   type=int, default=None)
     p.add_argument("--prev-simulations", type=int, default=None)
+    p.add_argument("--vs-random",     action="store_true", help="Also play vs random agent")
     p.add_argument("--device",       default=None)
     p.add_argument("--seed",         type=int, default=42)
     p.add_argument("--out",          type=Path, default=None, help="Save JSON results here")
+    p.add_argument("--model-name",   default="model",    help="Display name for evaluated model")
+    p.add_argument("--prev-name",    default="prev",     help="Display name for --prev-model")
     return p.parse_args()
 
 
@@ -223,13 +231,15 @@ def main() -> int:
     results = {}
 
     # --- vs random ---
-    print("=== vs Random ===")
-    rand_agent = RandomAgent(seed=args.seed)
-    results["random"] = play_match(model, rand_agent, args.games, rng)
-    rand_agent.close()
-    r = results["random"]
-    print(f"  -> W={r['wins']} L={r['losses']} D={r['draws']}  "
-          f"win_rate={r['win_rate']:.3f}  score={r['score']:.3f}\n")
+    if args.vs_random:
+        print("=== vs Random ===")
+        rand_agent = RandomAgent(seed=args.seed)
+        results["random"] = play_match(model, rand_agent, args.games, rng,
+                                       model_name=args.model_name, opp_name="Random")
+        rand_agent.close()
+        r = results["random"]
+        print(f"  -> W={r['wins']} L={r['losses']} D={r['draws']}  "
+              f"win_rate={r['win_rate']:.3f}  score={r['score']:.3f}\n")
 
     # --- vs prev model ---
     if args.prev_model:
@@ -238,7 +248,8 @@ def main() -> int:
         pr = args.prev_residuals or args.n_residuals
         ps = args.prev_simulations or args.simulations
         prev = MCTSAgent(args.prev_model, pf, pr, ps, device)
-        results["prev"] = play_match(model, prev, args.games, rng)
+        results["prev"] = play_match(model, prev, args.games, rng,
+                                      model_name=args.model_name, opp_name=args.prev_name)
         prev.close()
         r = results["prev"]
         print(f"  -> W={r['wins']} L={r['losses']} D={r['draws']}  "
@@ -248,7 +259,8 @@ def main() -> int:
     if args.solver:
         print("=== vs Solver ===")
         solver = SolverAgent(args.solver)
-        results["solver"] = play_match(model, solver, args.games, rng)
+        results["solver"] = play_match(model, solver, args.games, rng,
+                                        model_name=args.model_name, opp_name="Solver")
         solver.close()
         r = results["solver"]
         print(f"  -> W={r['wins']} L={r['losses']} D={r['draws']}  "

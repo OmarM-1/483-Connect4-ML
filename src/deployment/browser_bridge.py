@@ -950,7 +950,7 @@ def main() -> int:
             else:
                 print("[bridge] End-game logs mode enabled (suppress in-game move/sequence reporting)")
         if auto_like_mode:
-            print("[bridge] Operator commands: pause | resume | start(auto only) | status | wait <sec> | delay [x] | emote [code] | board | clear | info | quit")
+            print("[bridge] Operator commands: pause | resume | start(auto only) | status | wait <sec> | delay [x] | emote [code] | board | clear | info | retry | quit")
             if not auto_matchmaking_mode:
                 print("[bridge] Standby mode: bot will not start/queue matches; operator controls match start/end flow")
             print("[bridge] Delay: scale range x0.00-x1.80 (use 'delay 0' for instant play)")
@@ -1607,6 +1607,12 @@ def main() -> int:
                     post_game_waiting_empty_value=False,
                 )
                 queued_click_at = None
+        if cmd_result.trigger_force_move:
+            nonlocal blocked_sequence, blocked_sequence_until, pending_move_ctx, last_sequence
+            blocked_sequence = None
+            blocked_sequence_until = 0.0
+            pending_move_ctx = None
+            last_sequence = None
         return cmd_result
 
     try:
@@ -1825,7 +1831,12 @@ def main() -> int:
                     # Wait until the board is truly empty once before re-attaching.
                     if site_mode == "papergames" and post_game_waiting_empty:
                         counts = read_grid_column_counts(page)
-                        if counts is None or sum(counts) != 0:
+                        # Accept empty (0) or boards with ≤2 pieces — opponent may have
+                        # played 1-2 moves instantly (delay 0) before we poll.
+                        # Terminal boards always have far more pieces so this is safe.
+                        piece_count = sum(counts) if counts is not None else None
+                        board_is_fresh = piece_count is not None and piece_count <= 2
+                        if not board_is_fresh:
                             now = time.time()
                             if now - last_post_game_wait_log >= 5.0:
                                 print("[bridge] Waiting for fresh empty board before next game...")
@@ -1835,7 +1846,10 @@ def main() -> int:
 
                         post_game_waiting_empty = False
                         last_post_game_wait_log = 0.0
-                        print("[bridge] Fresh board detected; ready for next game")
+                        if piece_count == 0:
+                            print("[bridge] Fresh board detected; ready for next game")
+                        else:
+                            print(f"[bridge] Fresh board detected ({piece_count} piece(s) already played); ready for next game")
 
                     # Some papergames routes keep the same URL and may hide clear in-game
                     # text cues. If we can already read any board state (including empty ""),
@@ -2884,7 +2898,7 @@ def main() -> int:
 
                         if now - last_full_column_block_log >= 5.0:
                             print(
-                                "[bridge] Solver move blocked: "
+                                f"[bridge] {args.strategy.capitalize()} move blocked: "
                                 f"column {move_col + 1} is full on board; waiting for sequence resync"
                             )
                             last_full_column_block_log = now
